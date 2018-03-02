@@ -21,5 +21,7 @@ You will be asked for the password to username.  Data is stored for now in
 ~/.config/off365/config
 
 
-
-
+TODO:
+   - add dependency to adal, argdeco
+   - msgraph_api - need of command for delete, put, post
+   - Need setup.py

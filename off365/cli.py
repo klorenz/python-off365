@@ -1,4 +1,4 @@
-from .config import get_config, get_api
+from .config import get_config, get_api, read_config_file, write_config_file
 from argdeco import CommandDecorator, arg
 from .util import f, get_input_docs
 import config
@@ -8,7 +8,11 @@ import logging
 logging.basicConfig()
 logger = logging.getLogger('off365')
 
-import yaml, pyaml, pprint, sys
+import yaml
+import pyaml
+import pprint
+import sys
+
 
 def is_collection(name):
     """compare with https://developer.microsoft.com/en-us/graph/docs/api-reference/v1.0/resources/user"""
@@ -23,10 +27,12 @@ def is_collection(name):
 def is_userPrincipalName(name):
     return '@' in name and name.endswith('.onmicrosoft.com')
 
+
 def show_user(api, userPrincipalName):
     userPrincipalName = api.getUserPrincipalName(userPrincipalName)
     data = api.get(f("users/{userPrincipalName}")).json()
     pyaml.p(data)
+
 
 def create_users(api, confirm, userPrincipalName, *args):
     """
@@ -46,8 +52,8 @@ def create_users(api, confirm, userPrincipalName, *args):
     """
 
     entries = get_input_docs(args, keyName="userPrincipalName",
-        key=userPrincipalName, is_key=lambda n: '@' in n,
-        is_collection=is_collection)
+                             key=userPrincipalName, is_key=lambda n: '@' in n,
+                             is_collection=is_collection)
 
     results = []
     for e in entries:
@@ -73,20 +79,21 @@ def create_users(api, confirm, userPrincipalName, *args):
 
     return check_results(confirm, results, type)
 
+
 command = CommandDecorator(
-    arg('--config', '-C', help="configuration to use", default="default"),
-    arg("--debug", "-d", action="store_true", help="turn on debug mode"),
-    )
+    arg('--config', '-c', help="configuration to use", default="default"),
+    arg("--debug", action="store_true", help="turn on debug mode"),
+)
 
 
 @command("config",
-        arg("--client-id", help="client_id", required=True),
-        arg("--client-secret", help="client_secret"),
-        arg("--tenant", help="e.g. mycompany.onmicrosoft.com", required=True),
-        arg("--redirect-uri", help="redirect URI as specified in platforms section.  E.g. http://localhost/<appname>", required=True),
-        arg("--state", help="some state", default="12345"),
-        arg("--username", help="username to connect"),
-        )
+         arg("--client-id", help="client_id", required=True),
+         arg("--client-secret", help="client_secret"),
+         arg("--tenant", help="e.g. mycompany.onmicrosoft.com", required=True),
+         arg("--redirect-uri", help="redirect URI as specified in platforms section.  E.g. http://localhost/<appname>", required=True),
+         arg("--state", help="some state", default="12345"),
+         arg("--username", help="username to connect"),
+         )
 def cmd_config(config, client_id, client_secret, tenant, redirect_uri, state, username):
     """Write a configuration to config repo.  You have to do this at least for 'default'.
 
@@ -108,14 +115,16 @@ def cmd_config(config, client_id, client_secret, tenant, redirect_uri, state, us
 
     write_config_file(cfg)
 
+
 @command('get',
-    arg('endpoint', help="endpoint, e.g. users/USER@TENANT.onmicrosoft.com/memberOf"),
-    arg('param', nargs="*", help="parameters like foo=bar"),
-)
+         arg('endpoint', help="endpoint, e.g. users/USER@TENANT.onmicrosoft.com/memberOf"),
+         arg('param', nargs="*", help="parameters like foo=bar"),
+         )
 def cmd_get(config, endpoint, param):
     api = get_api(config)
     response = api.get(endpoint, get_input_docs(param, key="no-stdin")[0])
     return handle_response(response)
+
 
 def make_response_dict(response, verbose=False):
     result = {
@@ -125,13 +134,14 @@ def make_response_dict(response, verbose=False):
         "content_length": response.headers.get('content-length'),
         "encoding": response.encoding or 'utf-8',
         "content": response.content
-        }
+    }
 
     pprint.pprint(result)
     if verbose:
         result['headers'] = response.headers
 
     return result
+
 
 def handle_response(response, quiet=False, verbose=False):
     if isinstance(response, list):
@@ -144,7 +154,7 @@ def handle_response(response, quiet=False, verbose=False):
         result = make_response_dict(response)
 
     if verbose:
-        #result = {"request": { "headers", response.request.headers}
+        # result = {"request": { "headers", response.request.headers}
         #
         # add request and response
         #
@@ -160,11 +170,11 @@ def handle_response(response, quiet=False, verbose=False):
 
 
 @command('post',
-    arg('endpoint', help="endpoint, e.g. users"),
-    arg('--key', '-k', help="name of key in record"),
-    arg('--exclude', '-e', help="exclude given items (comma-separated), can be there multiple times", action="append"),
-    arg('param', nargs="*", help="parameters like foo=bar or '-' for "),
-)
+         arg('endpoint', help="endpoint, e.g. users"),
+         arg('--key', '-k', help="name of key in record"),
+         arg('--exclude', '-e', help="exclude given items (comma-separated), can be there multiple times", action="append"),
+         arg('param', nargs="*", help="parameters like foo=bar or '-' for "),
+         )
 def cmd_post(config, endpoint, param, key=None, exclude=[]):
     """post is usually used for creating some object, you can either pass
     command line arguments or you can pass "-" and do input via YAML from
@@ -192,9 +202,9 @@ def cmd_post(config, endpoint, param, key=None, exclude=[]):
 
 
 @command('delete',
-    arg('endpoint', help="endpoint, e.g. users/USER@TENANT.onmicrosoft.com"),
-    arg('param', nargs="*", help="parameters like foo=bar or '-' for "),
-)
+         arg('endpoint', help="endpoint, e.g. users/USER@TENANT.onmicrosoft.com"),
+         arg('param', nargs="*", help="parameters like foo=bar or '-' for "),
+         )
 def cmd_delete(config, endpoint, param):
     api = get_api(config)
     response = api.delete(endpoint, get_input_docs(param))
@@ -202,9 +212,9 @@ def cmd_delete(config, endpoint, param):
 
 
 @command('patch',
-    arg('endpoint', help="endpoint, e.g. users/USER@TENANT.onmicrosoft.com"),
-    arg('param', nargs="*", help="parameters like foo=bar or '-' for "),
-)
+         arg('endpoint', help="endpoint, e.g. users/USER@TENANT.onmicrosoft.com"),
+         arg('param', nargs="*", help="parameters like foo=bar or '-' for "),
+         )
 def cmd_patch(config, endpoint, param):
     api = get_api(config)
 
@@ -218,23 +228,24 @@ def cmd_patch(config, endpoint, param):
     handle_response(responses)
 
 
-
-
 @command('put',
-    arg('endpoint', help="endpoint, e.g. users/USER@TENANT.onmicrosoft.com"),
-    arg('--content-type', '-t', help="content-type of the input"),
-    arg('files', nargs="*", help="parameters like foo=bar or '-' for "),
-)
+         arg('endpoint', help="endpoint, e.g. users/USER@TENANT.onmicrosoft.com"),
+         arg('--content-type', '-t', help="content-type of the input"),
+         arg('files', nargs="*", help="parameters like foo=bar or '-' for "),
+         )
 def cmd_put(config, endpoint, files):
     # if - conten-type must be given
     # else guess mime type from file_name
     pass
 
+
 plans_command = command.add_subcommands("plans", help="Commands to manage plans")
+
+
 @plans_command("ls",
-    arg("product", nargs="?", help="list only plans of given product"),
-#    arg("--guid", , help="list only plans of given product"),
-)
+               arg("product", nargs="?", help="list only plans of given product"),
+               #    arg("--guid", , help="list only plans of given product"),
+               )
 def cmd_plans_ls(config, product):
     from .service_plans import SERVICE_PLANS
     pyaml.p(SERVICE_PLANS['skus_by_string_id'])
@@ -244,11 +255,13 @@ def cmd_plans_ls(config, product):
 #     arg("product", help="product to assign"),
 #     arg("")
 
-users_command = command.add_subcommands("users", help="Commands to manage users")
+
+users_command = command.add_subcommands("user", help="Commands to manage users")
+
 
 @users_command("fields",
-#    arg("--list-fields", help="show fields, which are available in lists")
-)
+               #    arg("--list-fields", help="show fields, which are available in lists")
+               )
 def cmd_users_fields(config):
     list_exclude = """aboutMe, birthday, hireDate, interests, mySite,
         pastProjects, preferredName, responsibilities, schools, skills,
@@ -257,12 +270,13 @@ def cmd_users_fields(config):
     fields = sorted(get_fields('user'))
     pyaml.p(fields)
 
+
 @users_command("ls",
-    arg("--all-fields", "-a", help="get all fields for a user ($select=...)", action="store_true"),
-    arg("--select", "-s", help="get all fields for a user ($select=...)", action="store_true"),
-    arg("--filter", "-f", help="filter query ($filter=)"),
-    arg('param', nargs="*", help="parameters like $select=x,y,z"),
-    )
+               arg("--all-fields", "-a", help="get all fields for a user ($select=...)", action="store_true"),
+               arg("--select", "-s", help="get all fields for a user ($select=...)", action="store_true"),
+               arg("--filter", "-f", help="filter query ($filter=)"),
+               arg('param', nargs="*", help="parameters like $select=x,y,z"),
+               )
 def cmd_users_ls(config, all_fields, select, filter, param):
     params = get_input_docs(param)[0]
     if all:
@@ -288,8 +302,8 @@ def cmd_users_ls(config, all_fields, select, filter, param):
 
 
 @users_command("assign",
-    arg("--filter", "-f", help="filter query ($filter=)"),
-)
+               arg("--filter", "-f", help="filter query ($filter=)"),
+               )
 def cmd_users_assign(config, filter):
     params = get_input_docs(param)[0]
 
@@ -298,10 +312,10 @@ def cmd_users_assign(config, filter):
 
 
 @users_command("show",
-    arg("--all-fields", "-a", help="get all fields for a user ($select=...)", action="store_true"),
-    arg("--select", "-s", help="get all fields for a user ($select=...)", action="store_true"),
-    arg('user', nargs="*", help="users to show"),
-    )
+               arg("--all-fields", "-a", help="get all fields for a user ($select=...)", action="store_true"),
+               arg("--select", "-s", help="get all fields for a user ($select=...)", action="store_true"),
+               arg('user', nargs="*", help="users to show"),
+               )
 def cmd_users_show(config, all_fields, select, param):
     params = get_input_docs(param)[0]
     if all:
@@ -310,7 +324,7 @@ def cmd_users_show(config, all_fields, select, param):
     api = get_api(config)
 
     for p in param:
-        data = api.get("users/"+p, params).json()
+        data = api.get("users/" + p, params).json()
     pyaml.p(data)
 
 # @command('users',
@@ -352,6 +366,7 @@ def cmd_users_show(config, all_fields, select, param):
 #
 #     elif command == 'create':
 #         create_users(api, confirm, *attr)
+
 
 @command('groups')
 def cmd_groups(config):

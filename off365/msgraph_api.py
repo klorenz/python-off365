@@ -1,12 +1,17 @@
 AUTHORITY = "https://login.microsoftonline.com"
-RESOURCE  = "https://graph.microsoft.com"
+RESOURCE = "https://graph.microsoft.com"
 
-import requests, adal
-import sys, time, pprint, logging
+import requests
+import adal
+import sys
+import time
+import pprint
+import logging
 logger = logging.getLogger('off365.msgraph_api')
 
 from urllib import urlencode
 from .util import f
+
 
 class MSGraphApi:
     def __init__(self, client_id, tenant, client_secret=None, username=None, password=None, state=None, resource=RESOURCE, **opts):
@@ -14,12 +19,11 @@ class MSGraphApi:
         self.client_secret = client_secret
         self.username = username
         self.password = password
-        self.tenant   = tenant
+        self.tenant = tenant
         self.state = state
         self.token = None
         self.expiresAt = 0
         self.resource = resource
-
 
     # service plan reference: https://docs.microsoft.com/de-de/azure/active-directory/active-directory-licensing-product-and-service-plan-reference
 
@@ -27,17 +31,18 @@ class MSGraphApi:
         if self.expiresAt < time.time():
             authority = f("{AUTHORITY}/{tenant}")
             context = adal.AuthenticationContext(authority)
-            self.token = context.acquire_token_with_username_password(self.resource, self.username, self.password, self.client_id)
+            self.token = context.acquire_token_with_username_password(
+                self.resource, self.username, self.password, self.client_id)
             self.accessToken = self.token['accessToken']
-            self.expiresAt   = time.time() + self.token['expiresIn']
+            self.expiresAt = time.time() + self.token['expiresIn']
 
     def headers(self):
         self.check_token()
         headers = {
-            'User-Agent' : 'python_off365/1.0',
-            'Authorization' : f('Bearer {accessToken}'),
-            'Accept' : 'application/json',
-            'Content-Type' : 'application/json'
+            'User-Agent': 'python_off365/1.0',
+            'Authorization': f('Bearer {accessToken}'),
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
         }
         return headers
 
@@ -64,9 +69,9 @@ class MSGraphApi:
         _params.update(parameter)
 
         if '?' in url:
-            url += "&"+urlencode(_params)
+            url += "&" + urlencode(_params)
         else:
-            url += "?"+urlencode(_params)
+            url += "?" + urlencode(_params)
 
         _headers = self.headers()
         _headers.update(headers)
