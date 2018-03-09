@@ -74,10 +74,11 @@ class MSGraphApi:
             _params.update(params)
         _params.update(parameter)
 
-        if '?' in url:
-            url += "&" + urlencode(_params)
-        else:
-            url += "?" + urlencode(_params)
+        for i, key in enumerate(_params):
+            if i == 0:
+                url += "?$" + key + "=" + _params[key]
+            else:
+                url += "&$" + key + "=" + _params[key]
 
         _headers = self.headers()
         _headers.update(headers)
