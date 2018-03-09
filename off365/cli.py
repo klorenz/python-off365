@@ -93,8 +93,9 @@ command = CommandDecorator(
          arg("--redirect-uri", help="redirect URI as specified in platforms section.  E.g. http://localhost/<appname>", required=True),
          arg("--state", help="some state", default="12345"),
          arg("--username", help="username to connect"),
+         arg("--auth", help="Authentication-method (by 'client' or 'user')", default="client")
          )
-def cmd_config(config, client_id, client_secret, tenant, redirect_uri, state, username):
+def cmd_config(config, client_id, client_secret, tenant, redirect_uri, state, username, auth):
     """Write a configuration to config repo.  You have to do this at least for 'default'.
 
     If you provide a username, you will be prompted for the password
@@ -105,7 +106,8 @@ def cmd_config(config, client_id, client_secret, tenant, redirect_uri, state, us
         'client_secret': client_secret,
         'tenant': tenant,
         'redirect_uri': redirect_uri,
-        'state': state
+        'state': state,
+        'auth': auth
     }
 
     if username:

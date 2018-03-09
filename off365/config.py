@@ -1,7 +1,9 @@
 from os import chmod, makedirs
 from os.path import exists, dirname, expanduser
-import pyaml, yaml
+import pyaml
+import yaml
 from .msgraph_api import MSGraphApi
+
 
 def read_config_file():
     config_file = expanduser("~/.config/off365/config")
@@ -16,6 +18,7 @@ def read_config_file():
         write_config_file({})
         return {}
 
+
 def write_config_file(data):
     config_file = expanduser("~/.config/off365/config")
     if not exists(dirname(config_file)):
@@ -26,12 +29,12 @@ def write_config_file(data):
 
     chmod(config_file, 0600)
 
+
 def get_config(name):
     try:
         return read_config_file()[name]
     except:
         raise Exception("You have to create a config with `off365 config`")
-
 
 
 def get_api(config):

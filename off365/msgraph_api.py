@@ -14,7 +14,7 @@ from .util import f
 
 
 class MSGraphApi:
-    def __init__(self, client_id, tenant, client_secret=None, username=None, password=None, state=None, resource=RESOURCE, **opts):
+    def __init__(self, client_id, tenant, client_secret=None, username=None, password=None, state=None, resource=RESOURCE, auth="client", **opts):
         self.client_id = client_id
         self.client_secret = client_secret
         self.username = username
@@ -24,6 +24,7 @@ class MSGraphApi:
         self.token = None
         self.expiresAt = 0
         self.resource = resource
+        self.auth = auth
 
     # service plan reference: https://docs.microsoft.com/de-de/azure/active-directory/active-directory-licensing-product-and-service-plan-reference
 
@@ -31,8 +32,13 @@ class MSGraphApi:
         if self.expiresAt < time.time():
             authority = f("{AUTHORITY}/{tenant}")
             context = adal.AuthenticationContext(authority)
-            self.token = context.acquire_token_with_username_password(
-                self.resource, self.username, self.password, self.client_id)
+
+            if self.auth == "client":
+                self.token = context.acquire_token_with_client_credentials(
+                    self.resource, self.client_id, self.client_secret)
+            elif self.auth == "user":
+                self.token = context.acquire_token_with_username_password(
+                    self.resource, self.username, self.password, self.client_id)
             self.accessToken = self.token['accessToken']
             self.expiresAt = time.time() + self.token['expiresIn']
 
