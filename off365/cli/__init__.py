@@ -1,8 +1,8 @@
-from .config import get_config, get_api, read_config_file, write_config_file
-from argdeco import CommandDecorator, arg, mutually_exclusive, opt
-from .util import f, get_input_docs
-import config
-from .resource import get_fields
+from ..util import f, get_input_docs
+import off365.config as config
+from ..resource import get_fields
+from off365.cli.common import get_config, get_api, read_config_file, write_config_file, \
+   CommandDecorator, arg, mutually_exclusive, opt, command, get_input_docs, f
 
 import logging
 logging.basicConfig()
@@ -81,11 +81,6 @@ def create_users(api, confirm, userPrincipalName, *args):
     return check_results(confirm, results, type)
 
 
-command = CommandDecorator(
-    arg('--config', '-c', help="configuration to use", default="default"),
-    arg("--debug", action="store_true", help="turn on debug mode"),
-)
-
 
 @command("config",
          arg("--client-id", help="client_id", required=True),
@@ -119,127 +114,9 @@ def cmd_config(config, client_id, client_secret, tenant, redirect_uri, state, us
     write_config_file(cfg)
 
 
-@command('get',
-         arg('endpoint', help="endpoint, e.g. users/USER@TENANT.onmicrosoft.com/memberOf"),
-         arg('param', nargs="*", help="parameters like foo=bar"),
-         )
-def cmd_get(config, endpoint, param):
-    api = get_api(config)
-    response = api.get(endpoint, get_input_docs(param, key="no-stdin")[0])
-    return handle_response(response)
 
 
-def make_response_dict(response, verbose=False):
-    result = {
-        "status_code": response.status_code,
-        #"headers": response.headers,
-        "content_type": response.headers.get('content-type'),
-        "content_length": response.headers.get('content-length'),
-        "encoding": response.encoding or 'utf-8',
-        "content": response.content
-    }
 
-    pprint.pprint(result)
-    if verbose:
-        result['headers'] = response.headers
-
-    return result
-
-
-def handle_response(response, quiet=False, verbose=False):
-    if isinstance(response, list):
-        assert len(response) == 1, "Response list not yet supported"
-        response = response[0]
-
-    try:
-        result = response.json()
-    except:
-        result = make_response_dict(response)
-
-    if verbose:
-        # result = {"request": { "headers", response.request.headers}
-        #
-        # add request and response
-        #
-        pass
-
-    if not quiet:
-        pyaml.p(result)
-
-    if 200 <= int(response.status_code) < 300:
-        return 0
-    else:
-        return 1
-
-
-@command('post',
-         arg('endpoint', help="endpoint, e.g. users"),
-         arg('--key', '-k', help="name of key in record"),
-         arg('--exclude', '-e', help="exclude given items (comma-separated), can be there multiple times", action="append"),
-         arg('param', nargs="*", help="parameters like foo=bar or '-' for "),
-         )
-def cmd_post(config, endpoint, param, key=None, exclude=[]):
-    """post is usually used for creating some object, you can either pass
-    command line arguments or you can pass "-" and do input via YAML from
-    stdin.
-    """
-    api = get_api(config)
-    if exclude is None:
-        exclude = []
-    _exclude = ",".join(exclude).split(",")
-
-    responses = []
-
-    for doc in get_input_docs(param, key=key):
-        endpoint.format(**doc)
-        for item in _exclude:
-            if item in doc:
-                del doc[item]
-
-        logger.debug("endpoint: %s", endpoint)
-        logger.debug("doc: %s", doc)
-
-        responses.append(api.post(endpoint, doc))
-
-    handle_response(responses)
-
-
-@command('delete',
-         arg('endpoint', help="endpoint, e.g. users/USER@TENANT.onmicrosoft.com"),
-         arg('param', nargs="*", help="parameters like foo=bar or '-' for "),
-         )
-def cmd_delete(config, endpoint, param):
-    api = get_api(config)
-    response = api.delete(endpoint, get_input_docs(param))
-    handle_response(response)
-
-
-@command('patch',
-         arg('endpoint', help="endpoint, e.g. users/USER@TENANT.onmicrosoft.com"),
-         arg('param', nargs="*", help="parameters like foo=bar or '-' for "),
-         )
-def cmd_patch(config, endpoint, param):
-    api = get_api(config)
-
-    docs = get_input_docs(param)
-
-    responses = []
-    for doc in docs:
-        response = api.patch(endpoint, doc)
-        responses.append(response)
-
-    handle_response(responses)
-
-
-@command('put',
-         arg('endpoint', help="endpoint, e.g. users/USER@TENANT.onmicrosoft.com"),
-         arg('--content-type', '-t', help="content-type of the input"),
-         arg('files', nargs="*", help="parameters like foo=bar or '-' for "),
-         )
-def cmd_put(config, endpoint, files):
-    # if - conten-type must be given
-    # else guess mime type from file_name
-    pass
 
 
 plans_command = command.add_subcommands("plans", help="Commands to manage plans")
@@ -530,5 +407,8 @@ def main(argv=None):
             return 1
         print(u"%s" % e).encode('utf-8')
         return 1
+
+
+import off365.cli.plumbing
 
 #@                        IN TXT     "google-site-verification=AyZKNg426MibWozr9ipX20-otJwd6R5GdOOOFEa9FS4"
