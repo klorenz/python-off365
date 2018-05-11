@@ -4,7 +4,7 @@ from os.path import exists
 
 import logging
 logger = logging.getLogger('off365.util')
-logger.setLevel(logging.DEBUG)
+#logger.setLevel(logging.DEBUG)
 
 def f(format_string):
     context = {}

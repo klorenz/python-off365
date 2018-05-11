@@ -1,5 +1,5 @@
 from .config import get_config, get_api, read_config_file, write_config_file
-from argdeco import CommandDecorator, arg
+from argdeco import CommandDecorator, arg, mutually_exclusive, opt
 from .util import f, get_input_docs
 import config
 from .resource import get_fields
@@ -12,6 +12,7 @@ import yaml
 import pyaml
 import pprint
 import sys
+import re
 
 
 def is_collection(name):
@@ -243,14 +244,61 @@ def cmd_put(config, endpoint, files):
 
 plans_command = command.add_subcommands("plans", help="Commands to manage plans")
 
+def create_matcher(query):
+    queries = []
+
+    for q in query:
+        if q.startswith('/') and q.endswith('/'):
+            queries.append(re.compile(q[1:-1]))
+        elif not q.isalnum():
+            queries.append(re.compile(q, re.IGNORECASE))
+        else:
+            if q.islower():
+                queries.append(re.compile(q, re.IGNORECASE))
+            else:
+                queries.append(re.compile(q))
+
+    def _matches(v):
+        for q in queries:
+            if q.search(v.get('productName', '')) or q.search(v.get('stringId', '')):
+                continue
+
+            return False
+        return True
+
+    return _matches
+
+
+
 
 @plans_command("ls",
-               arg("product", nargs="?", help="list only plans of given product"),
-               #    arg("--guid", , help="list only plans of given product"),
+               arg("query", nargs="*", help="list only plans matching query (matching stringId or productName)"),
+               arg('--full', help="full listing including all infos", action="store_true")
                )
-def cmd_plans_ls(config, product):
+def cmd_plans_ls(config, query, full):
     from .service_plans import SERVICE_PLANS
-    pyaml.p(SERVICE_PLANS['skus_by_string_id'])
+    if query:
+        _matches = create_matcher(query)
+
+        results = []
+        for k,v in SERVICE_PLANS['skus_by_string_id'].items():
+            if _matches(v):
+                results.append(v)
+    else:
+        results = SERVICE_PLANS['skus_by_string_id'].values()
+
+    if not full:
+        _results = {}
+        for v in results:
+            _name = v['productName']
+            _plans = [ p['stringId'] for p in v['availablePlans'].values() ]
+            _results[_name] = _plans
+
+        return pyaml.p(_results)
+    else:
+        return pyaml.p( dict((x['productName'],x) for x in results))
+
+#    return pyaml.p(SERVICE_PLANS['skus_by_string_id'])
 
 # products_command = command.add_subcommands("product", help="commands to manage products")
 # @products_command("assign")
@@ -302,31 +350,72 @@ def cmd_users_ls(config, all_fields, select, filter, param):
     data = api.get("users", params).json()
     pyaml.p(data)
 
+# @users_command("assign",
+#                arg("--filter", "-f", help="filter query ($filter=)"),
+#                )
+# def cmd_users_assign(config, filter):
+#     params = get_input_docs(param)[0]
+#
+#     if filter:
+#         params['$filter'] = filter
 
 @users_command("assign",
-               arg("--filter", "-f", help="filter query ($filter=)"),
-               )
-def cmd_users_assign(config, filter):
-    params = get_input_docs(param)[0]
+    arg('user', help="username"),
+    arg('action', choices=['add', 'remove', 'update', 'set']),
+    #arg('--add', action="store_true", help="add lics"),
+    #arg('--remove', action="store_true", help="add lics"),
+    #arg('--update', action="store_true", help="add lics"),
+    #arg('--set', action="store_true", help="add lics"),  # default
+    arg("product", help="space separated query parts. all must match, must select exactly one product"),
+    arg("plans", nargs="*", help="Plans to update")
+    )
+def cmd_plans_set(config, user, action, product, plans):
+    """assign products and plans to given user
 
-    if filter:
-        params['$filter'] = filter
+    """
+    from .service_plans import SERVICE_PLANS
+    _matches = create_matcher(product.split())
+
+    products = filter(_matches, SERVICE_PLANS['skus_by_string_id'].values())
+
+    assert len(products) != 0, "no products found matching '%s'" % product
+    assert len(products) == 1, "more than one product found matching '%s'" % product
+
+    #for v in SERVICE_PLANS['skus_by_string_id'].values():
+
+        #if _matches(v):
+
+
+    if action == 'set':
+        pass
+    # get current licenses
+
+    api = get_api(config)
+    user_info = api.get('users/%s' % user, **{'$select': 'assignedLicenses'})
+
+    #for lic in user_info['assignedLicenses']:
+
+
+    command = {'addLicenses': {}, 'removeLicenses': {}}
+
 
 
 @users_command("show",
                arg("--all-fields", "-a", help="get all fields for a user ($select=...)", action="store_true"),
-               arg("--select", "-s", help="get all fields for a user ($select=...)", action="store_true"),
+               arg("--select", "-s", help="select only these fields ($select=...)"),
                arg('user', nargs="*", help="users to show"),
                )
-def cmd_users_show(config, all_fields, select, param):
-    params = get_input_docs(param)[0]
-    if all:
-        params['$select'] = ",".join(get_fields('user'))
+def cmd_users_show(config, all_fields, select, user):
+    params = get_input_docs(user)[0]
+    if select:
+        params['select'] = select
+    if all_fields:
+        params['select'] = ",".join(get_fields('user'))
 
     api = get_api(config)
 
-    for p in param:
-        data = api.get("users/" + p, params).json()
+    for u in user:
+        data = api.get("users/" + u, params).json()
     pyaml.p(data)
 
 # @command('users',
@@ -370,12 +459,51 @@ def cmd_users_show(config, all_fields, select, param):
 #         create_users(api, confirm, *attr)
 
 
-@command('groups')
-def cmd_groups(config):
+group_command = command.add_subcommands("group", help="Commands to manage groups")
+
+
+#@group_command( 'create' )
+group_create_command = group_command.add_subcommands("create", help = "Commands to create a group")
+
+@group_create_command( 'office365', arg('mailNickname'), arg('displayName'), opt('internal') )
+def cmd_create_command(config, mailNickname, displayName, internal):
+    data = dict(
+        displayName = displayName,
+        mailEnabled = True,
+        mailNickname = mailNickname,
+        securityEnabled = False,
+        groupTypes = [
+            "Unified"
+        ],
+    )
+
+    api = get_api(config)
+    response = api.post('groups', data)
+
+    try:
+        data = response.json()
+    except:
+        return handle_response(response)
+
+    response = api.patch('groups/%(mail)s' % data, dict(
+        allowExternalSenders = not internal,
+    ))
+    response = api.patch('groups/%(mail)s' % data, dict(
+        autoSubscribeNewMembers = True,
+    ))
+    return handle_response(response)
+
+
+
+
+# #    arg('--type', '-t', choices=('Unified', 'DynamicMembership', "Unified,help="group type")
+# )
+
+@group_command('ls')
+def cmd_group_ls(config):
     api = get_api(config)
     data = api.get("groups").json()
     pyaml.p(data)
-
 
 def main(argv=None):
     def config_factory(args, **kwargs):
@@ -384,7 +512,6 @@ def main(argv=None):
             log.setLevel(logging.DEBUG)
 
         # you can access arguments globally from config
-        print("set args (config)")
         config.args = args
         params = vars(args).copy()
 

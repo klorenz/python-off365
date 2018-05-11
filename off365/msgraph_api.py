@@ -75,16 +75,22 @@ class MSGraphApi:
         _params.update(parameter)
 
         for i, key in enumerate(_params):
-            if i == 0:
-                url += "?$" + key + "=" + _params[key]
+            if key in ('select', 'filter'):
+              _key = '$'+key
             else:
-                url += "&$" + key + "=" + _params[key]
+              _key = key
+
+            if i == 0:
+                url += "?" + _key + "=" + _params[key]
+            else:
+                url += "&" + _key + "=" + _params[key]
 
         _headers = self.headers()
         _headers.update(headers)
 
         url = url.replace("%2C", ',')
 
+        print("request url: %s" % url)
         return requests.get(url, headers=_headers)
 
     def patch(self, endpoint, params, headers={}, **parameter):
