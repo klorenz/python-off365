@@ -2,7 +2,8 @@ from ..util import f, get_input_docs
 import off365.config as config
 from ..resource import get_fields
 from off365.cli.common import get_config, get_api, read_config_file, write_config_file, \
-   CommandDecorator, arg, mutually_exclusive, opt, command, get_input_docs, f
+   CommandDecorator, arg, mutually_exclusive, opt, command, get_input_docs, f, \
+   handle_response
 
 import logging
 logging.basicConfig()
@@ -338,10 +339,15 @@ def cmd_users_show(config, all_fields, select, user):
 
 group_command = command.add_subcommands("group", help="Commands to manage groups")
 
+#group_update_command = group_command.add_subcommands("update", help = "Update group settings")
+# @group_command('update',
+#     arg('group', help="group id to be updated"),
+#
+# )
+# 
 
 #@group_command( 'create' )
 group_create_command = group_command.add_subcommands("create", help = "Commands to create a group")
-
 @group_create_command( 'office365', arg('mailNickname'), arg('displayName'), opt('internal') )
 def cmd_create_command(config, mailNickname, displayName, internal):
     data = dict(
@@ -359,13 +365,15 @@ def cmd_create_command(config, mailNickname, displayName, internal):
 
     try:
         data = response.json()
+        pyaml.p(data)
     except:
         return handle_response(response)
 
-    response = api.patch('groups/%(mail)s' % data, dict(
+    response = api.patch('groups/%(id)s' % data, dict(
         allowExternalSenders = not internal,
     ))
-    response = api.patch('groups/%(mail)s' % data, dict(
+    handle_response(response)
+    response = api.patch('groups/%(id)s' % data, dict(
         autoSubscribeNewMembers = True,
     ))
     return handle_response(response)

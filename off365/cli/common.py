@@ -18,7 +18,7 @@ def make_response_dict(response, verbose=False):
         "content": response.content
     }
 
-    pprint.pprint(result)
+    #pprint.pprint(result)
     if verbose:
         result['headers'] = response.headers
 
